@@ -1,3 +1,4 @@
+-- PostgreSQL / Supabase ONLY. Do not import into MySQL/MariaDB — use crm-php/schema.sql for that.
 -- CRM database schema (PostgreSQL / Supabase compatible)
 
 create extension if not exists "pgcrypto";

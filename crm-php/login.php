@@ -3,15 +3,18 @@ require __DIR__ . '/bootstrap.php';
 $err = '';
 if (isset($_GET['logout'])) { $_SESSION = []; session_destroy(); header('Location: login.php'); exit; }
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $c = cfg();
-    // Throttle brute force: 1s delay on every attempt
-    sleep(1);
-    if (hash_equals($c['admin_user'], $_POST['user'] ?? '') && password_verify($_POST['pass'] ?? '', $c['admin_hash'])) {
+    sleep(1); // slows down password guessing
+    $st = db()->prepare('SELECT id, name, role, password_hash FROM users WHERE email = ? AND is_active = 1');
+    $st->execute([trim($_POST['email'] ?? '')]);
+    $u = $st->fetch();
+    if ($u && password_verify($_POST['pass'] ?? '', $u['password_hash'])) {
         session_regenerate_id(true);
-        $_SESSION['user'] = $c['admin_user'];
+        $_SESSION['uid'] = (int)$u['id'];
+        $_SESSION['name'] = $u['name'];
+        $_SESSION['role'] = $u['role'];
         header('Location: index.php'); exit;
     }
-    $err = 'Wrong username or password.';
+    $err = 'Wrong email or password.';
 }
 ?><!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -22,6 +25,6 @@ h1{font-size:18px;margin:0}input{padding:10px;border:1px solid #e3e6ec;border-ra
 button{padding:10px;border:0;border-radius:8px;background:#2f5bea;color:#fff;font:inherit;cursor:pointer}.e{color:#dc2626;font-size:13px}</style></head>
 <body><form method="post"><h1>Keshav Technosys CRM</h1>
 <?php if ($err): ?><div class="e"><?= htmlspecialchars($err) ?></div><?php endif; ?>
-<input name="user" placeholder="Username" autocomplete="username" required autofocus>
+<input name="email" type="email" placeholder="Email" autocomplete="username" required autofocus>
 <input name="pass" type="password" placeholder="Password" autocomplete="current-password" required>
 <button>Log in</button></form></body></html>

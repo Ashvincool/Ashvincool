@@ -1,6 +1,6 @@
 <?php
 require __DIR__ . '/bootstrap.php';
-if (empty($_SESSION['user'])) { header('Location: login.php'); exit; }
+require_login();
 ?><!doctype html>
 <html lang="en">
 <head>
@@ -60,15 +60,17 @@ dialog label{display:grid;gap:4px;font-size:12px;color:var(--muted)}
   <a data-v="dashboard">Dashboard</a><a data-v="contacts">Contacts</a><a data-v="companies">Companies</a>
   <a data-v="deals">Deals</a><a data-v="activities">Activities</a>
   <div class="sp"></div>
+  <a id="team" href="users.php" hidden>Team</a>
   <a href="login.php?logout=1">Log out</a>
 </nav>
 <main id="main"></main>
 <dialog id="dlg"><form method="dialog" id="frm"></form></dialog>
 
 <script>
-const STAGES=['New','Qualified','Proposal','Negotiation','Won','Lost'];
+let STAGES=[],USERS={},ME={};
 const CSRF=<?= json_encode(csrf()) ?>;
 let db={companies:[],contacts:[],deals:[],activities:[]};
+const owner=x=>USERS[x.owner_id]||'';
 async function api(body){
   const r=await fetch('api.php',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':CSRF},body:JSON.stringify(body)});
   const j=await r.json().catch(()=>({}));
@@ -78,7 +80,7 @@ async function api(body){
 async function load(){
   const r=await fetch('api.php');
   if(r.status===401){location='login.php';return}
-  db=await r.json();
+  const d=await r.json();STAGES=d.stages;USERS=d.users;ME=d.me;db=d;
 }
 const persist=(table,record)=>api({action:'save',table,record});
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -99,7 +101,7 @@ const E={
   {k:'source',l:'Source',sel:()=>['LinkedIn','Website','Referral','Cold outreach','Event','Other'].map(x=>[x,x]),def:'LinkedIn'},
   {k:'notes',l:'Notes',area:1}],
   cols:[['Name',x=>`<b>${esc(pname(x.id))}</b><br><small>${esc(x.job_title)}</small>`],['Company',x=>esc(cname(x.company_id))],
-   ['Email / Phone',x=>esc(x.email)+'<br><small>'+esc(x.phone)+'</small>'],['Status',x=>`<span class="badge">${esc(x.status)}</span>`],['Source',x=>esc(x.source)]]},
+   ['Email / Phone',x=>esc(x.email)+'<br><small>'+esc(x.phone)+'</small>'],['Status',x=>`<span class="badge">${esc(x.status)}</span>`],['Source',x=>esc(x.source)],['Owner',x=>esc(owner(x))]]},
  companies:{title:'Company',fields:[
   {k:'name',l:'Name',req:1},{k:'website',l:'Website'},{k:'industry',l:'Industry'},{k:'phone',l:'Phone'},{k:'city',l:'City'},{k:'notes',l:'Notes',area:1}],
   cols:[['Name',x=>`<b>${esc(x.name)}</b>`],['Industry',x=>esc(x.industry)],['City',x=>esc(x.city)],['Phone',x=>esc(x.phone)],
@@ -167,7 +169,7 @@ function kanban(){
   return head('Deals','deals')+`<div class="kan">`+STAGES.map(s=>{
     const ds=db.deals.filter(d=>d.stage===s&&(!q||JSON.stringify(d).toLowerCase().includes(q.toLowerCase())));
     return `<div class="col" data-s="${s}"><h3>${s}<span>${ds.length} · ${inr(ds.reduce((a,d)=>a+(d.amount||0),0))}</span></h3>`+
-     ds.map(d=>`<div class="deal" draggable="true" data-id="${d.id}"><b>${esc(d.title)}</b><small>${esc(cname(d.company_id))}${d.contact_id?' · '+esc(pname(d.contact_id)):''}</small><div class="amt">${inr(d.amount)}</div>
+     ds.map(d=>`<div class="deal" draggable="true" data-id="${d.id}"><b>${esc(d.title)}</b><small>${esc(cname(d.company_id))}${d.contact_id?' · '+esc(pname(d.contact_id)):''}</small><div class="amt">${inr(d.amount)}</div><small>${esc(owner(d))}</small>
       <div style="margin-top:6px"><button class="s" data-e="${d.id}">Edit</button> <button class="s d" data-d="${d.id}">Delete</button></div></div>`).join('')+`</div>`}).join('')+`</div>`;
 }
 function acts(){
@@ -204,7 +206,7 @@ function render(){
   });
 }
 document.querySelectorAll('nav a').forEach(a=>a.onclick=()=>{view=a.dataset.v;q='';render()});
-load().then(render);
+load().then(()=>{if(ME.role==='admin')$('#team').hidden=false;render()});
 </script>
 </body>
 </html>

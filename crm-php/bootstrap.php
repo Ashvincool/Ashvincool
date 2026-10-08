@@ -28,3 +28,11 @@ function db(): PDO {
 function csrf(): string {
     return $_SESSION['csrf'] ??= bin2hex(random_bytes(16));
 }
+
+function require_login(bool $json = false): void {
+    if (empty($_SESSION['uid'])) {
+        if ($json) { http_response_code(401); header('Content-Type: application/json'); exit('{"error":"Not logged in"}'); }
+        header('Location: login.php'); exit;
+    }
+}
+function is_admin(): bool { return ($_SESSION['role'] ?? '') === 'admin'; }
